@@ -1,0 +1,49 @@
+.map-layout {
+  padding: 0 1.5rem 1.5rem;
+  min-height: 0;
+}
+
+.map-card {
+  min-height: 78vh;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.map-surface {
+  width: 100%;
+  height: 100%;
+  min-height: 78vh;
+}
+
+.map-view {
+  width: 100%;
+  height: 100%;
+  min-height: 78vh;
+}
+
+:host ::ng-deep .layer-tree-panel {
+  width: min(360px, 70vw);
+  max-height: min(60vh, 560px);
+  overflow: auto;
+}
+
+:host ::ng-deep .layer-tree-panel calcite-tooltip-manager,
+:host ::ng-deep .layer-tree-panel .esri-layer-list {
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .map-card,
+  .map-surface,
+  .map-view {
+    min-height: 60vh;
+  }
+
+  :host ::ng-deep .layer-tree-panel {
+    width: min(300px, 72vw);
+    max-height: 50vh;
+  }
+}

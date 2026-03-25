@@ -1,0 +1,11 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f5f7;
+}
+
+body {
+  color: #1f2933;
+}

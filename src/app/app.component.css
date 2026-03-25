@@ -1,0 +1,30 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.hero {
+  padding: 1.5rem 1.5rem 0.75rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0b6e4f;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+
+.subtitle {
+  max-width: 52rem;
+  margin: 0.5rem 0 0;
+  line-height: 1.5;
+  color: #52606d;
+}
