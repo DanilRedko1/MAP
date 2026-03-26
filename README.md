@@ -31,6 +31,9 @@ The map composition lives in `src/assets/config/map-config.json`.
 - Use `layers` for nested group-layer contents.
 - `basemap` and `operationalLayers` come from the JSON file.
 - `fallbackBasemap` is still code-owned and is injected by `MapConfigService` when the JSON omits it.
+- `fallbackLayers` is an ordered failover list for loadable leaf layers and custom basemap sublayers (`baseLayers` and `referenceLayers`).
+- Put the primary resource first and backups after it. When a loader honors `fallbackLayers`, it should try each entry in order and stop at the first successful load.
+- Keep `fallbackLayers` off `group` and `graphics` layers.
 - While `npm start` is running, saving this JSON file should trigger an automatic browser reload.
 
 Example:
@@ -38,10 +41,39 @@ Example:
 ```json
 {
   "basemap": {
-    "mode": "well-known",
-    "id": "arcgis-navigation"
+    "mode": "custom",
+    "id": "custom-basemap",
+    "title": "Custom Basemap",
+    "baseLayers": [
+      {
+        "id": "world-imagery",
+        "title": "World Imagery",
+        "type": "tile",
+        "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+        "fallbackLayers": [
+          {
+            "type": "tile",
+            "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"
+          }
+        ]
+      }
+    ]
   },
   "operationalLayers": [
+    {
+      "id": "roads-network",
+      "title": "Road Network",
+      "type": "map-image",
+      "visible": true,
+      "order": 20,
+      "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer",
+      "fallbackLayers": [
+        {
+          "type": "map-image",
+          "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"
+        }
+      ]
+    },
     {
       "id": "demo-operational-layers",
       "title": "Demo Operational Layers",

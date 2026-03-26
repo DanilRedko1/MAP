@@ -1,0 +1,37 @@
+@use '@angular/material' as mat;
+
+@include mat.core();
+
+$map-primary: mat.define-palette(mat.$teal-palette, 700, 500, 900);
+$map-accent: mat.define-palette(mat.$blue-grey-palette, 700, 500, 900);
+$map-warn: mat.define-palette(mat.$red-palette, 700);
+
+$map-theme: mat.define-light-theme((
+  color: (
+    primary: $map-primary,
+    accent: $map-accent,
+    warn: $map-warn
+  ),
+  typography: mat.define-typography-config(
+    $font-family: '"Roboto", "Segoe UI", sans-serif'
+  ),
+  density: 0
+));
+
+@include mat.all-component-themes($map-theme);
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #edf2f7;
+}
+
+body {
+  color: #102a43;
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}

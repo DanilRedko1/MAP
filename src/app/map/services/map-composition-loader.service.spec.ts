@@ -2,6 +2,7 @@ import type Layer from '@arcgis/core/layers/Layer';
 import { TestBed } from '@angular/core/testing';
 
 import { MapConfig } from '../models/layer-config.model';
+import { MapBasemapStatusService } from './map-basemap-status.service';
 import { MapBasemapFactoryService } from './map-basemap-factory.service';
 import { MapCompositionLoaderService } from './map-composition-loader.service';
 import { MapConfigService } from './map-config.service';
@@ -9,11 +10,13 @@ import { MapLayerLoaderService } from './map-layer-loader.service';
 
 describe('MapCompositionLoaderService', () => {
   let service: MapCompositionLoaderService;
+  let basemapStatus: jasmine.SpyObj<MapBasemapStatusService>;
   let configService: jasmine.SpyObj<MapConfigService>;
   let basemapFactory: jasmine.SpyObj<MapBasemapFactoryService>;
   let layerLoader: jasmine.SpyObj<MapLayerLoaderService>;
 
   beforeEach(() => {
+    basemapStatus = jasmine.createSpyObj<MapBasemapStatusService>('MapBasemapStatusService', ['clear', 'markFallbackBasemap']);
     configService = jasmine.createSpyObj<MapConfigService>('MapConfigService', ['getConfig']);
     basemapFactory = jasmine.createSpyObj<MapBasemapFactoryService>('MapBasemapFactoryService', ['createBasemap']);
     layerLoader = jasmine.createSpyObj<MapLayerLoaderService>('MapLayerLoaderService', ['loadLayers']);
@@ -21,6 +24,7 @@ describe('MapCompositionLoaderService', () => {
     TestBed.configureTestingModule({
       providers: [
         MapCompositionLoaderService,
+        { provide: MapBasemapStatusService, useValue: basemapStatus },
         { provide: MapConfigService, useValue: configService },
         { provide: MapBasemapFactoryService, useValue: basemapFactory },
         { provide: MapLayerLoaderService, useValue: layerLoader }
@@ -47,12 +51,14 @@ describe('MapCompositionLoaderService', () => {
 
     const composition = await service.loadComposition();
 
+    expect(basemapStatus.clear).toHaveBeenCalledTimes(1);
     expect(configService.getConfig).toHaveBeenCalledTimes(1);
     expect(basemapFactory.createBasemap).toHaveBeenCalledOnceWith(config.basemap);
     expect(layerLoader.loadLayers).toHaveBeenCalledOnceWith(config.operationalLayers);
     expect(composition).toEqual({
       basemap: 'arcgis-navigation',
-      operationalLayers: layers
+      operationalLayers: layers,
+      config
     });
   });
 
@@ -62,6 +68,7 @@ describe('MapCompositionLoaderService', () => {
     configService.getConfig.and.returnValue(Promise.reject(error));
 
     await expectAsync(service.loadComposition()).toBeRejectedWith(error);
+    expect(basemapStatus.clear).toHaveBeenCalledTimes(1);
     expect(basemapFactory.createBasemap).not.toHaveBeenCalled();
     expect(layerLoader.loadLayers).not.toHaveBeenCalled();
   });
@@ -85,6 +92,8 @@ describe('MapCompositionLoaderService', () => {
 
     expect(composition.basemap).toBe('arcgis-topographic');
     expect(composition.operationalLayers).toEqual([]);
+    expect(composition.config).toBe(config);
+    expect(basemapStatus.markFallbackBasemap).toHaveBeenCalledOnceWith('arcgis-topographic', jasmine.any(Error));
     expect(console.warn).toHaveBeenCalled();
   });
 });

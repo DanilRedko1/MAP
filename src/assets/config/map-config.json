@@ -7,10 +7,30 @@
       "id": "world-imagery",
       "title": "World Imagery",
       "type": "tile",
-      "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
+      "url": "https://example.invalid/ArcGIS/rest/services/World_Imagery/MapServer",
+      "fallbackLayers": [
+        {
+          "type": "tile",
+          "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"
+        }
+      ]
     }]
   },
   "operationalLayers": [
+    {
+      "id": "roads-network",
+      "title": "Road Network",
+      "type": "map-image",
+      "visible": true,
+      "order": 5,
+      "url": "https://example.invalid/ArcGIS/rest/services/World_Street_Map/MapServer",
+      "fallbackLayers": [
+        {
+          "type": "map-image",
+          "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer"
+        }
+      ]
+    },
     {
       "id": "demo-operational-layers",
       "title": "Demo Operational Layers",
@@ -30,6 +50,59 @@
           "layerProps": {
             "title": "Sample Locations"
           },
+          "ui": {
+            "legendTitle": "Sample city markers",
+            "enableExtentFilter": true,
+            "filterableFields": [
+              {
+                "field": "region",
+                "label": "Region",
+                "type": "select",
+                "options": [
+                  {
+                    "label": "East",
+                    "value": "East"
+                  },
+                  {
+                    "label": "Mountain",
+                    "value": "Mountain"
+                  },
+                  {
+                    "label": "West",
+                    "value": "West"
+                  }
+                ]
+              },
+              {
+                "field": "title",
+                "label": "City name",
+                "type": "text",
+                "placeholder": "Search by city name"
+              }
+            ],
+            "displayFields": [
+              {
+                "field": "title",
+                "label": "City"
+              },
+              {
+                "field": "region",
+                "label": "Region"
+              },
+              {
+                "field": "category",
+                "label": "Category"
+              },
+              {
+                "field": "description",
+                "label": "Description"
+              }
+            ],
+            "clustering": {
+              "enabled": false
+            },
+            "timeAware": false
+          },
           "graphics": [
             {
               "geometry": {
@@ -48,6 +121,8 @@
               },
               "attributes": {
                 "title": "New York City",
+                "region": "East",
+                "category": "Metro",
                 "description": "Sample marker with popup content in Lower Manhattan."
               },
               "popupTemplate": {
@@ -72,6 +147,8 @@
               },
               "attributes": {
                 "title": "Denver",
+                "region": "Mountain",
+                "category": "Metro",
                 "description": "A second graphic to demonstrate multiple features on the map."
               },
               "popupTemplate": {
@@ -96,6 +173,8 @@
               },
               "attributes": {
                 "title": "San Francisco",
+                "region": "West",
+                "category": "Metro",
                 "description": "West coast sample point with a consistent popup template."
               },
               "popupTemplate": {

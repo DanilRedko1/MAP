@@ -1,13 +1,232 @@
 <section class="map-layout">
-  <div class="map-card">
+  <div class="map-workbench">
+    <aside *ngIf="loadError === null" class="map-sidebar">
+      <mat-card class="map-panel-card">
+        <p class="map-panel__eyebrow">Explore data</p>
+        <h2 class="map-panel__title">Map summary</h2>
+        <p class="map-panel__text">
+          Use the filters and layer actions to narrow the map to the records that matter most.
+        </p>
+
+        <div class="map-summary">
+          <article class="map-summary__stat">
+            <span class="map-summary__label">Active layers</span>
+            <strong class="map-summary__value">{{ summary.activeLayers }}</strong>
+          </article>
+          <article class="map-summary__stat">
+            <span class="map-summary__label">Active filters</span>
+            <strong class="map-summary__value">{{ summary.activeFilters }}</strong>
+          </article>
+          <article class="map-summary__stat">
+            <span class="map-summary__label">Visible results</span>
+            <strong class="map-summary__value">{{ summary.resultCount }}</strong>
+          </article>
+        </div>
+
+        <div class="map-share">
+          <mat-form-field appearance="outline" class="map-field--full">
+            <mat-label>Share view</mat-label>
+            <input id="shareViewUrl" matInput type="text" [value]="shareUrl" readonly>
+          </mat-form-field>
+
+          <button type="button" mat-stroked-button color="primary" [disabled]="!shareUrl" (click)="copyShareUrl()">
+            <mat-icon>content_copy</mat-icon>
+            Copy
+          </button>
+        </div>
+      </mat-card>
+
+      <mat-card *ngIf="hasFilterPanels" class="map-panel-card">
+        <div class="map-panel__header">
+          <div>
+            <p class="map-panel__eyebrow">Refine results</p>
+            <h2 class="map-panel__title">Filters</h2>
+          </div>
+
+          <button type="button" mat-stroked-button (click)="clearFilters()">Reset</button>
+        </div>
+
+        <mat-checkbox
+          *ngIf="hasExtentFilterPanels"
+          class="map-checkbox"
+          [checked]="extentFilterEnabled"
+          (change)="onExtentFilterToggle($event.checked)">
+          Only show records in the current map extent
+        </mat-checkbox>
+
+        <div class="map-filter-groups">
+          <section *ngFor="let panel of filterPanels" class="map-filter-group">
+            <h3 class="map-filter-group__title">{{ panel.title }}</h3>
+
+            <div *ngFor="let field of panel.fields" class="map-field">
+              <mat-form-field appearance="outline" class="map-field--full">
+                <mat-label>{{ field.label }}</mat-label>
+
+                <mat-select
+                  *ngIf="field.type === 'select'"
+                  [value]="filterState[panel.id]?.[field.field] ?? ''"
+                  (selectionChange)="onFilterValueChange(panel.id, field.field, $event.value)">
+                  <mat-option value="">All</mat-option>
+                  <mat-option *ngFor="let option of field.options" [value]="option.value">{{ option.label }}</mat-option>
+                </mat-select>
+
+                <input
+                  *ngIf="field.type !== 'select'"
+                  matInput
+                  type="text"
+                  [placeholder]="field.placeholder || 'Filter records'"
+                  [value]="filterState[panel.id]?.[field.field] ?? ''"
+                  (input)="onFilterValueChange(panel.id, field.field, $any($event.target).value)">
+              </mat-form-field>
+            </div>
+          </section>
+        </div>
+      </mat-card>
+
+      <mat-card *ngIf="hasLayerHealth" class="map-panel-card">
+        <div class="map-panel__header">
+          <div>
+            <p class="map-panel__eyebrow">Layer health</p>
+            <h2 class="map-panel__title">Layers</h2>
+          </div>
+
+          <button
+            *ngIf="visibleLayerRecords.length > 0"
+            type="button"
+            mat-stroked-button
+            (click)="resetLayerVisibility()">
+            Reset visibility
+          </button>
+        </div>
+
+        <section *ngIf="basemapLayerRecords.length > 0 || basemapRuntimeState.fallbackBasemapActive" class="map-health-section">
+          <div class="map-health-section__header">
+            <h3 class="map-health-section__title">Basemap</h3>
+          </div>
+
+          <p *ngIf="basemapRuntimeState.fallbackBasemapActive" class="map-layer-card__note">
+            Default fallback basemap in use: {{ basemapRuntimeState.fallbackBasemapId }}
+          </p>
+          <p *ngIf="basemapRuntimeState.fallbackReason" class="map-layer-card__error">
+            {{ basemapRuntimeState.fallbackReason }}
+          </p>
+
+          <div *ngIf="basemapLayerRecords.length > 0" class="map-layer-list">
+            <article *ngFor="let record of basemapLayerRecords" class="map-layer-card">
+              <div class="map-layer-card__header">
+                <div class="map-layer-card__content">
+                  <h3 class="map-layer-card__title">{{ basemapStatusTitle(record) }}</h3>
+
+                  <mat-chip-list aria-label="Basemap layer state">
+                    <mat-chip [class]="basemapStatusClass(record)" disableRipple>
+                      {{ basemapStatusLabel(record) }}
+                    </mat-chip>
+                  </mat-chip-list>
+                </div>
+              </div>
+
+              <p *ngIf="record.error" class="map-layer-card__error">{{ record.error }}</p>
+              <p *ngIf="basemapStatusNote(record) as note" class="map-layer-card__note">{{ note }}</p>
+              <p *ngIf="basemapRecoveryNote(record) as recovery" class="map-layer-card__note">{{ recovery }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section *ngIf="visibleLayerRecords.length > 0" class="map-health-section">
+          <div class="map-health-section__header">
+            <h3 class="map-health-section__title">Operational layers</h3>
+          </div>
+
+          <div class="map-layer-list">
+            <article *ngFor="let record of visibleLayerRecords" class="map-layer-card">
+              <div class="map-layer-card__header">
+                <div class="map-layer-card__content">
+                  <h3 class="map-layer-card__title">{{ record.config.title }}</h3>
+
+                  <mat-chip-list aria-label="Layer state">
+                    <mat-chip [class]="layerStatusClass(record)" disableRipple>
+                      {{ layerStatusLabel(record) }}
+                    </mat-chip>
+                    <mat-chip
+                      *ngIf="readLayerResultCount(record) !== null"
+                      class="map-chip map-chip--count"
+                      disableRipple>
+                      {{ readLayerResultCount(record) }} items
+                    </mat-chip>
+                  </mat-chip-list>
+                </div>
+
+                <div class="map-layer-card__actions">
+                  <button
+                    type="button"
+                    mat-stroked-button
+                    [disabled]="record.status !== 'loaded' || !record.layer"
+                    (click)="toggleLayerVisibility(record)">
+                    <mat-icon>{{ record.layer?.visible ? 'visibility_off' : 'visibility' }}</mat-icon>
+                    {{ record.layer?.visible ? 'Hide' : 'Show' }}
+                  </button>
+                  <button
+                    type="button"
+                    mat-stroked-button
+                    [disabled]="record.status !== 'loaded' || !record.layer"
+                    (click)="zoomToLayer(record)">
+                    <mat-icon>zoom_in_map</mat-icon>
+                    Zoom
+                  </button>
+                </div>
+              </div>
+
+              <p *ngIf="record.error" class="map-layer-card__error">{{ record.error }}</p>
+              <p *ngIf="layerStatusNote(record) as note" class="map-layer-card__note">{{ note }}</p>
+              <p *ngIf="layerRecoveryNote(record) as recovery" class="map-layer-card__note">{{ recovery }}</p>
+            </article>
+          </div>
+        </section>
+      </mat-card>
+    </aside>
+
     <div #mapSurfaceNode class="map-surface">
-      <div #mapViewNode class="map-view" [class.map-view--hidden]="loadError !== null"></div>
+      <div #mapViewNode class="map-view" [class.map-view--hidden]="loadError !== null || isInitializing"></div>
+
+      <div *ngIf="isInitializing" class="map-loading" aria-live="polite">
+        <mat-card class="map-loading__card">
+          <mat-progress-spinner mode="indeterminate" diameter="52"></mat-progress-spinner>
+          <p>Loading map runtime...</p>
+        </mat-card>
+      </div>
+
       <div *ngIf="loadError as error" class="map-error" role="alert" aria-live="polite">
-        <div class="map-error__content">
+        <mat-card class="map-error__content">
+          <mat-icon class="map-error__icon">error</mat-icon>
           <h2 class="map-error__title">{{ error.title }}</h2>
           <p class="map-error__message">{{ error.message }}</p>
-        </div>
+        </mat-card>
       </div>
     </div>
+
+    <aside *ngIf="selectedFeature as details" class="map-details" aria-live="polite">
+      <mat-card class="map-details__card">
+        <div class="map-details__header">
+          <div>
+            <p class="map-panel__eyebrow">Selected record</p>
+            <h2 class="map-details__title">{{ details.title }}</h2>
+            <p class="map-details__subtitle">{{ details.layerTitle }}</p>
+          </div>
+
+          <button type="button" mat-icon-button aria-label="Close selected record" (click)="closeDetails()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
+
+        <mat-divider></mat-divider>
+
+        <dl class="map-details__grid">
+          <div *ngFor="let entry of details.entries" class="map-details__entry">
+            <dt>{{ entry.label }}</dt>
+            <dd>{{ entry.value }}</dd>
+          </div>
+        </dl>
+      </mat-card>
+    </aside>
   </div>
 </section>

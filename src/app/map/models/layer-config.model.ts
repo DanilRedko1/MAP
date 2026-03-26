@@ -3,11 +3,14 @@ import type Layer from '@arcgis/core/layers/Layer';
 
 export type PrimitiveValue = string | number | boolean;
 
+export type LayerFilterControlType = 'text' | 'select';
 export type LayerListMode = 'show' | 'hide' | 'hide-children';
 export type LayerLoadStatus = 'loading' | 'loaded' | 'failed' | 'skipped';
 export type LayerType = 'feature' | 'map-image' | 'tile' | 'vector-tile' | 'graphics' | 'group';
 export type LeafLayerType = Exclude<LayerType, 'group'>;
+export type UrlLayerType = Exclude<LeafLayerType, 'graphics'>;
 export type BasemapLayerType = 'tile' | 'vector-tile' | 'map-image';
+export type BasemapLayerSlot = 'base' | 'reference';
 export type ResourceAuthMode = 'none' | 'identity-manager' | 'token';
 export type ResourceAuthScope = 'layer' | 'resolver' | 'both';
 
@@ -80,6 +83,36 @@ export interface GraphicItemConfig {
   };
 }
 
+export interface LayerFilterOptionConfig {
+  label: string;
+  value: PrimitiveValue;
+}
+
+export interface LayerFilterFieldConfig {
+  field: string;
+  label: string;
+  type?: LayerFilterControlType;
+  placeholder?: string;
+  options?: LayerFilterOptionConfig[];
+}
+
+export interface LayerDisplayFieldConfig {
+  field: string;
+  label: string;
+}
+
+export interface LayerUiConfig {
+  legendTitle?: string;
+  filterableFields?: LayerFilterFieldConfig[];
+  displayFields?: LayerDisplayFieldConfig[];
+  enableExtentFilter?: boolean;
+  refreshIntervalMs?: number;
+  clustering?: {
+    enabled?: boolean;
+  };
+  timeAware?: boolean;
+}
+
 export interface BaseLayerConfig extends SharedResourceConfig {
   id: string;
   title: string;
@@ -87,6 +120,17 @@ export interface BaseLayerConfig extends SharedResourceConfig {
   visible?: boolean;
   listMode?: LayerListMode;
   order?: number;
+  ui?: LayerUiConfig;
+}
+
+export interface OperationalLayerFallbackConfig extends SharedResourceConfig {
+  type?: UrlLayerType;
+  layerProps?: Record<string, unknown>;
+}
+
+export interface BasemapLayerFallbackConfig extends SharedResourceConfig {
+  type?: BasemapLayerType;
+  layerProps?: Record<string, unknown>;
 }
 
 export interface GroupLayerConfig extends BaseLayerConfig {
@@ -96,8 +140,9 @@ export interface GroupLayerConfig extends BaseLayerConfig {
 }
 
 export interface UrlLeafLayerConfig extends BaseLayerConfig {
-  type: 'feature' | 'map-image' | 'tile' | 'vector-tile';
+  type: UrlLayerType;
   layerProps?: Record<string, unknown>;
+  fallbackLayers?: OperationalLayerFallbackConfig[];
 }
 
 export interface GraphicsLayerConfig extends BaseLayerConfig {
@@ -115,6 +160,7 @@ export interface BasemapLayerConfig extends SharedResourceConfig {
   title?: string;
   order?: number;
   layerProps?: Record<string, unknown>;
+  fallbackLayers?: BasemapLayerFallbackConfig[];
 }
 
 export interface WellKnownBasemapConfig {
@@ -173,13 +219,37 @@ export interface ResolvedBasemapDefinition {
 export interface MapComposition {
   basemap: Basemap | string;
   operationalLayers: Layer[];
+  config: MapConfig;
 }
 
-export interface LayerRuntimeRecord {
+export interface LayerLoadMetadata {
+  loadedViaFallback?: boolean;
+  fallbackIndex?: number;
+  attemptErrors?: string[];
+}
+
+export interface LayerRuntimeRecord extends LayerLoadMetadata {
   id: string;
   config: LayerConfig;
   layer?: Layer;
   status: LayerLoadStatus;
   error?: string;
   childIds: string[];
+  itemCount?: number;
+  isEmpty?: boolean;
+}
+
+export interface BasemapLayerRuntimeRecord extends LayerLoadMetadata {
+  id: string;
+  title: string;
+  slot: BasemapLayerSlot;
+  config: BasemapLayerConfig;
+  status: Exclude<LayerLoadStatus, 'skipped'>;
+  error?: string;
+}
+
+export interface BasemapRuntimeState {
+  fallbackBasemapActive: boolean;
+  fallbackBasemapId?: string;
+  fallbackReason?: string;
 }

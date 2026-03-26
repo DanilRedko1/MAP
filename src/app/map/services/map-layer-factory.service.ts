@@ -64,9 +64,12 @@ export class MapLayerFactoryService {
   private createGraphicsLayer(config: GraphicsLayerConfig, resolved?: ResolvedLayerDefinition): GraphicsLayer {
     const layer = new GraphicsLayer(this.buildGraphicsLayerProps(config, resolved) as __esri.GraphicsLayerProperties);
     const graphics = resolved?.graphics ?? config.graphics ?? [];
+    const sourceGraphics = graphics.map((graphic) => this.createGraphic(graphic));
 
-    if (graphics.length > 0) {
-      layer.addMany(graphics.map((graphic) => this.createGraphic(graphic)));
+    (layer as GraphicsLayer & { __sourceGraphics?: Graphic[] }).__sourceGraphics = sourceGraphics.map((graphic) => graphic.clone());
+
+    if (sourceGraphics.length > 0) {
+      layer.addMany(sourceGraphics);
     }
 
     return layer;

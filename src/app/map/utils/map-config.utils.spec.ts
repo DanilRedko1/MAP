@@ -202,4 +202,294 @@ describe('map-config.utils', () => {
       'Graphic layer "sample-locations" only supports point geometries in this implementation.'
     );
   });
+
+  it('accepts layer exploration metadata for filters and details', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'sample-locations',
+          title: 'Sample Locations',
+          type: 'graphics',
+          ui: {
+            legendTitle: 'Sample city markers',
+            enableExtentFilter: true,
+            filterableFields: [
+              {
+                field: 'region',
+                label: 'Region',
+                type: 'select',
+                options: [
+                  {
+                    label: 'East',
+                    value: 'East'
+                  }
+                ]
+              }
+            ],
+            displayFields: [
+              {
+                field: 'title',
+                label: 'City'
+              }
+            ],
+            clustering: {
+              enabled: false
+            },
+            timeAware: false
+          },
+          graphics: [
+            {
+              geometry: {
+                type: 'point',
+                longitude: -74.006,
+                latitude: 40.7128
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).not.toThrow();
+  });
+
+  it('rejects invalid exploration metadata', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'sample-locations',
+          title: 'Sample Locations',
+          type: 'graphics',
+          ui: {
+            filterableFields: [
+              {
+                field: 'region',
+                label: 'Region',
+                type: 'range'
+              } as unknown as Record<string, unknown>
+            ]
+          }
+        } as unknown as MapConfig['operationalLayers'][number]
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'layer("sample-locations").ui.filterableFields[0].type must be either "text" or "select" when provided.'
+    );
+  });
+
+  it('accepts fallbackLayers for URL-backed operational layers and basemap sublayers', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'custom',
+        id: 'custom-basemap',
+        title: 'Custom Basemap',
+        baseLayers: [
+          {
+            id: 'base-layer',
+            type: 'tile',
+            url: 'https://example.com/base',
+            fallbackLayers: [
+              {
+                type: 'map-image',
+                url: 'https://backup.example.com/base'
+              }
+            ]
+          }
+        ]
+      },
+      operationalLayers: [
+        {
+          id: 'roads',
+          title: 'Roads',
+          type: 'feature',
+          source: {
+            mode: 'resolved',
+            resolverKey: 'roads',
+            endpoint: '/resolve/roads'
+          },
+          fallbackLayers: [
+            {
+              source: {
+                mode: 'direct'
+              },
+              url: 'https://backup.example.com/roads/FeatureServer/0'
+            }
+          ]
+        }
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).not.toThrow();
+  });
+
+  it('rejects empty fallback layer arrays', () => {
+    const config: MapConfig = {
+      ...createValidConfig(),
+      operationalLayers: [
+        {
+          id: 'roads',
+          title: 'Roads',
+          type: 'feature',
+          url: 'https://example.com/roads',
+          fallbackLayers: []
+        }
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'layer("roads").fallbackLayers must contain at least one entry when provided.'
+    );
+  });
+
+  it('rejects fallbackLayers on group layers', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'group-a',
+          title: 'Group A',
+          type: 'group',
+          fallbackLayers: [
+            {
+              type: 'feature',
+              url: 'https://backup.example.com/group'
+            }
+          ],
+          layers: []
+        } as unknown as MapConfig['operationalLayers'][number]
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'Layer "group-a" does not support fallbackLayers because only URL-backed leaf layers can define them.'
+    );
+  });
+
+  it('rejects fallbackLayers on graphics layers', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'sample-locations',
+          title: 'Sample Locations',
+          type: 'graphics',
+          fallbackLayers: [
+            {
+              type: 'feature',
+              url: 'https://backup.example.com/locations'
+            }
+          ]
+        } as unknown as MapConfig['operationalLayers'][number]
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'Layer "sample-locations" does not support fallbackLayers because graphics layers are not supported.'
+    );
+  });
+
+  it('rejects invalid fallback entries that do not resolve to a usable url source', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'roads',
+          title: 'Roads',
+          type: 'feature',
+          source: {
+            mode: 'resolved',
+            resolverKey: 'roads',
+            endpoint: '/resolve/roads'
+          },
+          fallbackLayers: [
+            {
+              source: {
+                mode: 'direct'
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'layer("roads").fallbackLayers[0] requires a url or a resolved source.'
+    );
+  });
+
+  it('rejects nested fallback recursion in fallback entries', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'roads',
+          title: 'Roads',
+          type: 'feature',
+          url: 'https://example.com/roads',
+          fallbackLayers: [
+            {
+              url: 'https://backup.example.com/roads',
+              fallbackLayers: [
+                {
+                  url: 'https://nested.example.com/roads'
+                }
+              ]
+            } as unknown as Record<string, unknown>
+          ]
+        } as unknown as MapConfig['operationalLayers'][number]
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'layer("roads").fallbackLayers[0] cannot define nested fallbackLayers.'
+    );
+  });
+
+  it('rejects unsupported identity properties in fallback entries', () => {
+    const config: MapConfig = {
+      basemap: {
+        mode: 'well-known',
+        id: 'arcgis-topographic'
+      },
+      operationalLayers: [
+        {
+          id: 'roads',
+          title: 'Roads',
+          type: 'feature',
+          url: 'https://example.com/roads',
+          fallbackLayers: [
+            {
+              title: 'Backup Roads',
+              url: 'https://backup.example.com/roads'
+            } as unknown as Record<string, unknown>
+          ]
+        } as unknown as MapConfig['operationalLayers'][number]
+      ]
+    };
+
+    expect(() => validateMapConfig(config)).toThrowError(
+      'layer("roads").fallbackLayers[0] contains unsupported property "title".'
+    );
+  });
 });

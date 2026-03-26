@@ -1,16 +1,23 @@
 import {
   BasemapConfig,
+  BasemapLayerConfig,
   BasemapLayerType,
   GraphicItemConfig,
   LayerConfig,
+  LayerDisplayFieldConfig,
+  LayerFilterFieldConfig,
+  LayerFilterOptionConfig,
   LeafLayerConfig,
   LeafLayerType,
+  LayerUiConfig,
   MapConfig,
   PrimitiveValue,
   ResourceAuthConfig,
-  ResourceSourceConfig
+  ResourceSourceConfig,
+  UrlLayerType,
+  UrlLeafLayerConfig
 } from '../models/layer-config.model';
-import { isPlainObject } from './map-object.utils';
+import { hasOwn, isPlainObject } from './map-object.utils';
 
 type OrderedItem = {
   order?: number;
@@ -116,6 +123,8 @@ function validateBasemapLayerConfig(config: unknown, seenIds: Set<string>, path:
   if (!url && source?.mode !== 'resolved') {
     throw new Error(`Basemap layer "${layerId}" requires a url or a resolved source.`);
   }
+
+  validateBasemapFallbackLayers(config as unknown as BasemapLayerConfig, layerId);
 }
 
 function validateLayerConfig(config: LayerConfig, seenIds: Set<string>, path: string): void {
@@ -126,6 +135,7 @@ function validateLayerConfig(config: LayerConfig, seenIds: Set<string>, path: st
   const layerType = readUnknown(config, 'type');
   const source = readOptionalProperty<ResourceSourceConfig>(config, 'source');
   const auth = readOptionalProperty<ResourceAuthConfig>(config, 'auth');
+  const ui = readOptionalProperty<LayerUiConfig>(config, 'ui');
 
   if (seenIds.has(layerId)) {
     throw new Error(`Duplicate config id "${layerId}" found in ${path}.`);
@@ -134,8 +144,13 @@ function validateLayerConfig(config: LayerConfig, seenIds: Set<string>, path: st
   seenIds.add(layerId);
   validateSharedSource(source, `${path}("${layerId}").source`);
   validateAuth(auth, `${path}("${layerId}").auth`);
+  validateLayerUi(ui, `layer("${layerId}").ui`);
 
   if (layerType === 'group') {
+    if (hasOwn(config as Record<string, unknown>, 'fallbackLayers')) {
+      throw new Error(`Layer "${layerId}" does not support fallbackLayers because only URL-backed leaf layers can define them.`);
+    }
+
     const groupConfig = config as Extract<LayerConfig, { type: 'group' }>;
 
     assertArray(groupConfig.layers, `group("${layerId}").layers`);
@@ -158,8 +173,118 @@ function validateLayerConfig(config: LayerConfig, seenIds: Set<string>, path: st
   }
 
   if (layerType === 'graphics') {
+    if (hasOwn(config as Record<string, unknown>, 'fallbackLayers')) {
+      throw new Error(`Layer "${layerId}" does not support fallbackLayers because graphics layers are not supported.`);
+    }
+
     validateGraphicLayer(leafLayer as Extract<LeafLayerConfig, { type: 'graphics' }>, layerId);
+    return;
   }
+
+  validateOperationalFallbackLayers(leafLayer as UrlLeafLayerConfig, layerId);
+}
+
+function validateLayerUi(config: LayerUiConfig | undefined, path: string): void {
+  if (!config) {
+    return;
+  }
+
+  assertPlainObject(config, `Expected an object at ${path}.`);
+
+  if (readUnknown(config, 'legendTitle') !== undefined) {
+    assertNonEmptyString(readUnknown(config, 'legendTitle'), `${path}.legendTitle`);
+  }
+
+  const filterableFields = readOptionalProperty<unknown[]>(config, 'filterableFields');
+
+  if (filterableFields !== undefined) {
+    assertArray(filterableFields, `${path}.filterableFields`);
+  }
+
+  for (const [index, field] of (filterableFields ?? []).entries()) {
+    validateFilterFieldConfig(field as LayerFilterFieldConfig, `${path}.filterableFields[${index}]`);
+  }
+
+  const displayFields = readOptionalProperty<unknown[]>(config, 'displayFields');
+
+  if (displayFields !== undefined) {
+    assertArray(displayFields, `${path}.displayFields`);
+  }
+
+  for (const [index, field] of (displayFields ?? []).entries()) {
+    validateDisplayFieldConfig(field as LayerDisplayFieldConfig, `${path}.displayFields[${index}]`);
+  }
+
+  const enableExtentFilter = readUnknown(config, 'enableExtentFilter');
+
+  if (enableExtentFilter !== undefined && typeof enableExtentFilter !== 'boolean') {
+    throw new Error(`${path}.enableExtentFilter must be a boolean when provided.`);
+  }
+
+  const refreshIntervalMs = readUnknown(config, 'refreshIntervalMs');
+
+  if (refreshIntervalMs !== undefined && (typeof refreshIntervalMs !== 'number' || refreshIntervalMs < 0)) {
+    throw new Error(`${path}.refreshIntervalMs must be a non-negative number when provided.`);
+  }
+
+  const timeAware = readUnknown(config, 'timeAware');
+
+  if (timeAware !== undefined && typeof timeAware !== 'boolean') {
+    throw new Error(`${path}.timeAware must be a boolean when provided.`);
+  }
+
+  const clustering = readUnknown(config, 'clustering');
+
+  if (clustering !== undefined) {
+    assertPlainObject(clustering, `Expected an object at ${path}.clustering.`);
+
+    const enabled = readUnknown(clustering, 'enabled');
+
+    if (enabled !== undefined && typeof enabled !== 'boolean') {
+      throw new Error(`${path}.clustering.enabled must be a boolean when provided.`);
+    }
+  }
+}
+
+function validateFilterFieldConfig(config: LayerFilterFieldConfig, path: string): void {
+  assertPlainObject(config, `Expected an object at ${path}.`);
+  assertNonEmptyString(readUnknown(config, 'field'), `${path}.field`);
+  assertNonEmptyString(readUnknown(config, 'label'), `${path}.label`);
+
+  const type = readUnknown(config, 'type');
+
+  if (type !== undefined && type !== 'text' && type !== 'select') {
+    throw new Error(`${path}.type must be either "text" or "select" when provided.`);
+  }
+
+  if (readUnknown(config, 'placeholder') !== undefined) {
+    assertNonEmptyString(readUnknown(config, 'placeholder'), `${path}.placeholder`);
+  }
+
+  const options = readOptionalProperty<unknown[]>(config, 'options');
+
+  if (options !== undefined) {
+    assertArray(options, `${path}.options`);
+  }
+
+  for (const [index, option] of (options ?? []).entries()) {
+    validateFilterOptionConfig(option as LayerFilterOptionConfig, `${path}.options[${index}]`);
+  }
+}
+
+function validateFilterOptionConfig(config: LayerFilterOptionConfig, path: string): void {
+  assertPlainObject(config, `Expected an object at ${path}.`);
+  assertNonEmptyString(readUnknown(config, 'label'), `${path}.label`);
+
+  if (!isPrimitiveValue(readUnknown(config, 'value'))) {
+    throw new Error(`${path}.value must be a string, number, or boolean.`);
+  }
+}
+
+function validateDisplayFieldConfig(config: LayerDisplayFieldConfig, path: string): void {
+  assertPlainObject(config, `Expected an object at ${path}.`);
+  assertNonEmptyString(readUnknown(config, 'field'), `${path}.field`);
+  assertNonEmptyString(readUnknown(config, 'label'), `${path}.label`);
 }
 
 function validateGraphicLayer(config: Extract<LeafLayerConfig, { type: 'graphics' }>, layerId: string): void {
@@ -183,6 +308,124 @@ function validateGraphic(graphic: GraphicItemConfig, layerId: string): void {
 
   if (typeof readUnknown(geometry, 'longitude') !== 'number' || typeof readUnknown(geometry, 'latitude') !== 'number') {
     throw new Error(`Graphic layer "${layerId}" requires numeric longitude and latitude values.`);
+  }
+}
+
+function validateBasemapFallbackLayers(config: BasemapLayerConfig, layerId: string): void {
+  const fallbackLayers = readUnknown(config, 'fallbackLayers');
+
+  if (fallbackLayers === undefined) {
+    return;
+  }
+
+  assertArray(fallbackLayers, `Expected an array at basemapLayer("${layerId}").fallbackLayers.`);
+
+  if (fallbackLayers.length === 0) {
+    throw new Error(`basemapLayer("${layerId}").fallbackLayers must contain at least one entry when provided.`);
+  }
+
+  for (const [index, fallback] of fallbackLayers.entries()) {
+    validateBasemapFallbackLayer(fallback, config, layerId, index);
+  }
+}
+
+function validateBasemapFallbackLayer(
+  candidate: unknown,
+  primaryConfig: BasemapLayerConfig,
+  layerId: string,
+  index: number
+): void {
+  const path = `basemapLayer("${layerId}").fallbackLayers[${index}]`;
+
+  assertPlainObject(candidate, `Expected an object at ${path}.`);
+
+  if (hasOwn(candidate, 'fallbackLayers')) {
+    throw new Error(`${path} cannot define nested fallbackLayers.`);
+  }
+
+  validateFallbackOverrideKeys(candidate, path);
+
+  const effectiveType = hasOwn(candidate, 'type') ? readUnknown(candidate, 'type') : primaryConfig.type;
+  const source = hasOwn(candidate, 'source') ? readOptionalProperty<ResourceSourceConfig>(candidate, 'source') : primaryConfig.source;
+  const auth = hasOwn(candidate, 'auth') ? readOptionalProperty<ResourceAuthConfig>(candidate, 'auth') : primaryConfig.auth;
+  const url = hasOwn(candidate, 'url') ? readOptionalProperty<string>(candidate, 'url') : primaryConfig.url;
+
+  if (!isBasemapLayerType(effectiveType)) {
+    throw new Error(`${path} has unsupported type "${String(effectiveType)}".`);
+  }
+
+  validateSharedSource(source, `${path}.source`);
+  validateAuth(auth, `${path}.auth`);
+
+  if (!url && source?.mode !== 'resolved') {
+    throw new Error(`${path} requires a url or a resolved source.`);
+  }
+}
+
+function validateOperationalFallbackLayers(config: UrlLeafLayerConfig, layerId: string): void {
+  const fallbackLayers = readUnknown(config, 'fallbackLayers');
+
+  if (fallbackLayers === undefined) {
+    return;
+  }
+
+  assertArray(fallbackLayers, `Expected an array at layer("${layerId}").fallbackLayers.`);
+
+  if (fallbackLayers.length === 0) {
+    throw new Error(`layer("${layerId}").fallbackLayers must contain at least one entry when provided.`);
+  }
+
+  for (const [index, fallback] of fallbackLayers.entries()) {
+    validateOperationalFallbackLayer(fallback, config, layerId, index);
+  }
+}
+
+function validateOperationalFallbackLayer(
+  candidate: unknown,
+  primaryConfig: UrlLeafLayerConfig,
+  layerId: string,
+  index: number
+): void {
+  const path = `layer("${layerId}").fallbackLayers[${index}]`;
+
+  assertPlainObject(candidate, `Expected an object at ${path}.`);
+
+  if (hasOwn(candidate, 'fallbackLayers')) {
+    throw new Error(`${path} cannot define nested fallbackLayers.`);
+  }
+
+  validateFallbackOverrideKeys(candidate, path);
+
+  const effectiveType = hasOwn(candidate, 'type') ? readUnknown(candidate, 'type') : primaryConfig.type;
+  const source = hasOwn(candidate, 'source')
+    ? readOptionalProperty<ResourceSourceConfig>(candidate, 'source')
+    : primaryConfig.source;
+  const auth = hasOwn(candidate, 'auth')
+    ? readOptionalProperty<ResourceAuthConfig>(candidate, 'auth')
+    : primaryConfig.auth;
+  const url = hasOwn(candidate, 'url') ? readOptionalProperty<string>(candidate, 'url') : primaryConfig.url;
+
+  if (!isUrlLayerType(effectiveType)) {
+    throw new Error(`${path} has unsupported type "${String(effectiveType)}".`);
+  }
+
+  validateSharedSource(source, `${path}.source`);
+  validateAuth(auth, `${path}.auth`);
+
+  if (!url && source?.mode !== 'resolved') {
+    throw new Error(`${path} requires a url or a resolved source.`);
+  }
+}
+
+function validateFallbackOverrideKeys(candidate: Record<string, unknown>, path: string): void {
+  const allowedKeys = new Set(['type', 'url', 'source', 'auth', 'layerProps', 'opacity', 'metadata']);
+
+  for (const key of Object.keys(candidate)) {
+    if (allowedKeys.has(key) || key === 'fallbackLayers') {
+      continue;
+    }
+
+    throw new Error(`${path} contains unsupported property "${key}".`);
   }
 }
 
@@ -241,7 +484,7 @@ function assertArray(value: unknown, path: string): asserts value is unknown[] {
   }
 }
 
-function assertPlainObject(value: unknown, message: string): void {
+function assertPlainObject(value: unknown, message: string): asserts value is Record<string, unknown> {
   if (!isPlainObject(value)) {
     throw new Error(message);
   }
@@ -285,10 +528,17 @@ function isBasemapLayerType(type: unknown): type is BasemapLayerType {
   return type === 'tile' || type === 'vector-tile' || type === 'map-image';
 }
 
-function isLeafLayerType(type: unknown): type is LeafLayerType {
+function isUrlLayerType(type: unknown): type is UrlLayerType {
   return type === 'feature'
     || type === 'map-image'
     || type === 'tile'
-    || type === 'vector-tile'
-    || type === 'graphics';
+    || type === 'vector-tile';
+}
+
+function isLeafLayerType(type: unknown): type is LeafLayerType {
+  return isUrlLayerType(type) || type === 'graphics';
+}
+
+function isPrimitiveValue(value: unknown): value is PrimitiveValue {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
