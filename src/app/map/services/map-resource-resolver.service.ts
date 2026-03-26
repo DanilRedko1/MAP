@@ -8,12 +8,18 @@ import {
   LeafLayerConfig,
   PortalItemBasemapConfig,
   PreparedAuthContext,
-  PrimitiveValue,
   ResolvedBasemapDefinition,
   ResolvedLayerDefinition,
   ResourceSourceConfig
 } from '../models/layer-config.model';
 import { toStringRecord } from '../utils/map-config.utils';
+import {
+  readNumber,
+  readOptionalArray,
+  readOptionalPlainObject,
+  readPlainObject,
+  readString
+} from '../utils/map-object.utils';
 
 @Injectable({
   providedIn: 'root'
@@ -71,60 +77,32 @@ export class MapResourceResolverService {
   }
 
   private normalizeResolvedLayerDefinition(id: string, payload: unknown): ResolvedLayerDefinition {
-    const record = readRecord(payload);
+    const record = readPlainObject(payload, 'Resolved resource payload must be an object.');
 
     return {
       id: readString(record['id']) ?? id,
       title: readString(record['title']),
       url: readString(record['url']),
-      layerProps: readOptionalRecord(record['layerProps']) ?? readOptionalRecord(record['properties']),
-      auth: readOptionalRecord(record['auth']) as Partial<ResolvedLayerDefinition['auth']>,
+      layerProps: readOptionalPlainObject(record['layerProps']) ?? readOptionalPlainObject(record['properties']),
+      auth: readOptionalPlainObject(record['auth']) as Partial<ResolvedLayerDefinition['auth']>,
       graphics: readGraphics(record['graphics'])
     };
   }
 
   private normalizeResolvedBasemapDefinition(id: string, payload: unknown): ResolvedBasemapDefinition {
-    const record = readRecord(payload);
+    const record = readPlainObject(payload, 'Resolved resource payload must be an object.');
 
     return {
       id: readString(record['id']) ?? id,
       title: readString(record['title']),
       portalItemId: readString(record['portalItemId']) ?? readString(record['id']),
-      baseLayers: readOptionalArray(record['baseLayers']) as BasemapLayerConfig[] | undefined,
-      referenceLayers: readOptionalArray(record['referenceLayers']) as BasemapLayerConfig[] | undefined,
+      baseLayers: readOptionalArray<BasemapLayerConfig>(record['baseLayers']),
+      referenceLayers: readOptionalArray<BasemapLayerConfig>(record['referenceLayers']),
       spatialReferenceWkid: readNumber(record['spatialReferenceWkid'])
     };
   }
 }
 
-function readRecord(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) {
-    throw new Error('Resolved resource payload must be an object.');
-  }
-
-  return value;
-}
-
-function readOptionalRecord(value: unknown): Record<string, unknown> | undefined {
-  return isRecord(value) ? value : undefined;
-}
-
-function readOptionalArray(value: unknown): unknown[] | undefined {
-  return Array.isArray(value) ? value : undefined;
-}
-
-function readString(value: unknown): string | undefined {
-  return typeof value === 'string' ? value : undefined;
-}
-
-function readNumber(value: unknown): number | undefined {
-  return typeof value === 'number' ? value : undefined;
-}
-
 function readGraphics(value: unknown): GraphicItemConfig[] | undefined {
-  return Array.isArray(value) ? value as GraphicItemConfig[] : undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, PrimitiveValue | unknown> {
-  return typeof value === 'object' && value !== null;
+  return readOptionalArray<GraphicItemConfig>(value);
 }

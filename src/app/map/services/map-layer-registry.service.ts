@@ -18,7 +18,7 @@ export class MapLayerRegistryService {
       id: config.id,
       config,
       status: 'loading',
-      childIds: config.kind === 'group' ? config.children.map((child) => child.id) : []
+      childIds: this.readChildIds(config)
     });
   }
 
@@ -28,7 +28,7 @@ export class MapLayerRegistryService {
       config,
       layer,
       status: 'loaded',
-      childIds: config.kind === 'group' ? config.children.map((child) => child.id) : []
+      childIds: this.readChildIds(config)
     });
   }
 
@@ -38,11 +38,15 @@ export class MapLayerRegistryService {
       config,
       status: 'failed',
       error: error instanceof Error ? error.message : String(error),
-      childIds: config.kind === 'group' ? config.children.map((child) => child.id) : []
+      childIds: this.readChildIds(config)
     });
   }
 
   getSnapshot(): LayerRuntimeRecord[] {
     return Array.from(this.records.values());
+  }
+
+  private readChildIds(config: LayerConfig): string[] {
+    return config.type === 'group' ? config.layers.map((child) => child.id) : [];
   }
 }

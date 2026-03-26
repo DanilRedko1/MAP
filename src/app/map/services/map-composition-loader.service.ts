@@ -5,7 +5,6 @@ import {
   MapComposition,
   MapConfig
 } from '../models/layer-config.model';
-import { validateMapConfig } from '../utils/map-config.utils';
 import { MapBasemapFactoryService } from './map-basemap-factory.service';
 import { MapConfigService } from './map-config.service';
 import { MapLayerLoaderService } from './map-layer-loader.service';
@@ -21,9 +20,7 @@ export class MapCompositionLoaderService {
   ) {}
 
   async loadComposition(): Promise<MapComposition> {
-    const config = this.configService.getConfig();
-
-    validateMapConfig(config);
+    const config = await this.configService.getConfig();
 
     const basemap = await this.loadBasemap(config, config.fallbackBasemap ?? DEFAULT_FALLBACK_BASEMAP);
     const operationalLayers = await this.layerLoader.loadLayers(config.operationalLayers);

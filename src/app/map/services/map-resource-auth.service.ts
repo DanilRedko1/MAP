@@ -6,10 +6,10 @@ import { firstValueFrom } from 'rxjs';
 
 import {
   PreparedAuthContext,
-  PrimitiveValue,
   ResourceAuthConfig
 } from '../models/layer-config.model';
 import { toStringRecord } from '../utils/map-config.utils';
+import { readOptionalPlainObject, readString } from '../utils/map-object.utils';
 
 @Injectable({
   providedIn: 'root'
@@ -127,15 +127,12 @@ export class MapResourceAuthService {
       return response;
     }
 
-    if (!isRecord(response)) {
+    const record = readOptionalPlainObject(response);
+
+    if (!record) {
       return undefined;
     }
 
-    const token = response['token'] ?? response['accessToken'] ?? response['access_token'];
-    return typeof token === 'string' ? token : undefined;
+    return readString(record['token']) ?? readString(record['accessToken']) ?? readString(record['access_token']);
   }
-}
-
-function isRecord(value: unknown): value is Record<string, PrimitiveValue | unknown> {
-  return typeof value === 'object' && value !== null;
 }

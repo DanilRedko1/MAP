@@ -1,7 +1,13 @@
 <section class="map-layout">
   <div class="map-card">
     <div #mapSurfaceNode class="map-surface">
-      <div #mapViewNode class="map-view"></div>
+      <div #mapViewNode class="map-view" [class.map-view--hidden]="loadError !== null"></div>
+      <div *ngIf="loadError as error" class="map-error" role="alert" aria-live="polite">
+        <div class="map-error__content">
+          <h2 class="map-error__title">{{ error.title }}</h2>
+          <p class="map-error__message">{{ error.message }}</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>

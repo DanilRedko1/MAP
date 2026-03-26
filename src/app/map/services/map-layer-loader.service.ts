@@ -35,8 +35,8 @@ export class MapLayerLoaderService {
     this.layerRegistry.start(config);
 
     try {
-      if (config.kind === 'group') {
-        const children = await Promise.all(sortByOrder(config.children).map((child) => this.buildLayer(child)));
+      if (config.type === 'group') {
+        const children = await Promise.all(sortByOrder(config.layers).map((child) => this.buildLayer(child)));
         const groupLayer = new GroupLayer({
           id: config.id,
           title: config.title,

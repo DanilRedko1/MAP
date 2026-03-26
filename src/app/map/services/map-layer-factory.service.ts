@@ -10,6 +10,7 @@ import VectorTileLayer from '@arcgis/core/layers/VectorTileLayer';
 import SimpleMarkerSymbol from '@arcgis/core/symbols/SimpleMarkerSymbol';
 
 import {
+  BasemapLayerConfig,
   DEFAULT_LAYER_LIST_MODE,
   GraphicItemConfig,
   GraphicsLayerConfig,
@@ -27,18 +28,37 @@ export class MapLayerFactoryService {
     resolved?: ResolvedLayerDefinition,
     authContext?: PreparedAuthContext
   ): Layer {
-    switch (config.kind) {
+    switch (config.type) {
       case 'feature':
-        return new FeatureLayer(this.buildUrlLayerProps(config, resolved, authContext) as __esri.FeatureLayerProperties);
       case 'map-image':
-        return new MapImageLayer(this.buildUrlLayerProps(config, resolved, authContext) as __esri.MapImageLayerProperties);
       case 'tile':
-        return new TileLayer(this.buildUrlLayerProps(config, resolved, authContext) as __esri.TileLayerProperties);
       case 'vector-tile':
-        return new VectorTileLayer(this.buildUrlLayerProps(config, resolved, authContext) as __esri.VectorTileLayerProperties);
+        return this.createUrlLayer(
+          config.type,
+          this.buildUrlLayerProps(config, resolved, authContext, {
+            errorLabel: 'Layer',
+            title: resolved?.title ?? config.title,
+            visible: config.visible ?? true,
+            listMode: config.listMode ?? DEFAULT_LAYER_LIST_MODE
+          })
+        );
       case 'graphics':
         return this.createGraphicsLayer(config, resolved);
     }
+  }
+
+  createBasemapLayer(
+    config: BasemapLayerConfig,
+    resolved?: ResolvedLayerDefinition,
+    authContext?: PreparedAuthContext
+  ): Layer {
+    return this.createUrlLayer(
+      config.type,
+      this.buildUrlLayerProps(config, resolved, authContext, {
+        errorLabel: 'Basemap layer',
+        title: config.title ?? resolved?.title
+      })
+    );
   }
 
   private createGraphicsLayer(config: GraphicsLayerConfig, resolved?: ResolvedLayerDefinition): GraphicsLayer {
@@ -90,15 +110,37 @@ export class MapLayerFactoryService {
     };
   }
 
+  private createUrlLayer(
+    type: Exclude<LeafLayerConfig['type'], 'graphics'>,
+    props: Record<string, unknown>
+  ): Layer {
+    switch (type) {
+      case 'feature':
+        return new FeatureLayer(props as __esri.FeatureLayerProperties);
+      case 'map-image':
+        return new MapImageLayer(props as __esri.MapImageLayerProperties);
+      case 'tile':
+        return new TileLayer(props as __esri.TileLayerProperties);
+      case 'vector-tile':
+        return new VectorTileLayer(props as __esri.VectorTileLayerProperties);
+    }
+  }
+
   private buildUrlLayerProps(
-    config: Exclude<LeafLayerConfig, GraphicsLayerConfig>,
+    config: Exclude<LeafLayerConfig, GraphicsLayerConfig> | BasemapLayerConfig,
     resolved: ResolvedLayerDefinition | undefined,
-    authContext: PreparedAuthContext | undefined
+    authContext: PreparedAuthContext | undefined,
+    options: {
+      errorLabel: string;
+      title?: string;
+      visible?: boolean;
+      listMode?: string;
+    }
   ): Record<string, unknown> {
     const url = resolved?.url ?? config.url;
 
     if (!url) {
-      throw new Error(`Layer "${config.id}" could not be created because no url was resolved.`);
+      throw new Error(`${options.errorLabel} "${config.id}" could not be created because no url was resolved.`);
     }
 
     const customParameters = this.getLayerCustomParameters(authContext);
@@ -107,10 +149,10 @@ export class MapLayerFactoryService {
       ...(config.layerProps ?? {}),
       ...(resolved?.layerProps ?? {}),
       id: config.id,
-      title: resolved?.title ?? config.title,
+      title: options.title,
       url,
-      visible: config.visible ?? true,
-      listMode: config.listMode ?? DEFAULT_LAYER_LIST_MODE,
+      ...(options.visible !== undefined ? { visible: options.visible } : {}),
+      ...(options.listMode !== undefined ? { listMode: options.listMode } : {}),
       ...(typeof config.opacity === 'number' ? { opacity: config.opacity } : {}),
       ...(customParameters ? { customParameters } : {})
     };

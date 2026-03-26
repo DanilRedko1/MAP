@@ -5,9 +5,9 @@ export type PrimitiveValue = string | number | boolean;
 
 export type LayerListMode = 'show' | 'hide' | 'hide-children';
 export type LayerLoadStatus = 'loading' | 'loaded' | 'failed' | 'skipped';
-export type LayerKind = 'feature' | 'map-image' | 'tile' | 'vector-tile' | 'graphics' | 'group';
-export type LeafLayerKind = Exclude<LayerKind, 'group'>;
-export type BasemapLayerKind = 'tile' | 'vector-tile' | 'map-image';
+export type LayerType = 'feature' | 'map-image' | 'tile' | 'vector-tile' | 'graphics' | 'group';
+export type LeafLayerType = Exclude<LayerType, 'group'>;
+export type BasemapLayerType = 'tile' | 'vector-tile' | 'map-image';
 export type ResourceAuthMode = 'none' | 'identity-manager' | 'token';
 export type ResourceAuthScope = 'layer' | 'resolver' | 'both';
 
@@ -83,25 +83,25 @@ export interface GraphicItemConfig {
 export interface BaseLayerConfig extends SharedResourceConfig {
   id: string;
   title: string;
-  kind: LayerKind;
+  type: LayerType;
   visible?: boolean;
   listMode?: LayerListMode;
   order?: number;
 }
 
 export interface GroupLayerConfig extends BaseLayerConfig {
-  kind: 'group';
+  type: 'group';
   visibilityMode?: 'independent' | 'inherited' | 'exclusive';
-  children: LayerConfig[];
+  layers: LayerConfig[];
 }
 
 export interface UrlLeafLayerConfig extends BaseLayerConfig {
-  kind: 'feature' | 'map-image' | 'tile' | 'vector-tile';
+  type: 'feature' | 'map-image' | 'tile' | 'vector-tile';
   layerProps?: Record<string, unknown>;
 }
 
 export interface GraphicsLayerConfig extends BaseLayerConfig {
-  kind: 'graphics';
+  type: 'graphics';
   layerProps?: Record<string, unknown>;
   graphics?: GraphicItemConfig[];
 }
@@ -111,7 +111,7 @@ export type LayerConfig = GroupLayerConfig | LeafLayerConfig;
 
 export interface BasemapLayerConfig extends SharedResourceConfig {
   id: string;
-  kind: BasemapLayerKind;
+  type: BasemapLayerType;
   title?: string;
   order?: number;
   layerProps?: Record<string, unknown>;
