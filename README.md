@@ -32,8 +32,10 @@ The map composition lives in `src/assets/config/map-config.json`.
 - `basemap` and `operationalLayers` come from the JSON file.
 - `fallbackBasemap` is still code-owned and is injected by `MapConfigService` when the JSON omits it.
 - `fallbackLayers` is an ordered failover list for loadable leaf layers and custom basemap sublayers (`baseLayers` and `referenceLayers`).
-- Put the primary resource first and backups after it. When a loader honors `fallbackLayers`, it should try each entry in order and stop at the first successful load.
+- Put the primary resource first and backups after it. When a loader honors `fallbackLayers`, it tries each entry in order, calls ArcGIS `layer.load()` on each candidate, and stops at the first successful load.
 - Keep `fallbackLayers` off `group` and `graphics` layers.
+- Backup sources stay in the same logical map slot. They do not appear as separate layers in the layer list.
+- The sample config intentionally uses failing primary URLs for one basemap sublayer and one operational layer so fallback behavior is visible during startup.
 - While `npm start` is running, saving this JSON file should trigger an automatic browser reload.
 
 Example:
@@ -49,7 +51,7 @@ Example:
         "id": "world-imagery",
         "title": "World Imagery",
         "type": "tile",
-        "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+        "url": "https://example.invalid/ArcGIS/rest/services/World_Imagery/MapServer",
         "fallbackLayers": [
           {
             "type": "tile",
@@ -66,7 +68,7 @@ Example:
       "type": "map-image",
       "visible": true,
       "order": 20,
-      "url": "https://services.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer",
+      "url": "https://example.invalid/ArcGIS/rest/services/World_Street_Map/MapServer",
       "fallbackLayers": [
         {
           "type": "map-image",
